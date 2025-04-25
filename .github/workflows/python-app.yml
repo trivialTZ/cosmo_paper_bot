@@ -1,34 +1,30 @@
 # .github/workflows/post_arxiv.yml
 name: "Daily ArXiv → Slack"
 
-# Run every day at 12:00 UTC (which is 08:00 EDT)
 on:
   schedule:
+    # every day 12:00 UTC  (08:00 EDT, 07:00 EST)
     - cron: '0 12 * * *'
-  workflow_dispatch:
+  workflow_dispatch:   # keep manual trigger
 
 jobs:
   post-arxiv:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
       - name: Install dependencies
-        run: |
-          pip install requests feedparser
+        run: pip install requests feedparser
 
-      - name: Run ArXiv→Slack bot
+      - name: Run ArXiv → Slack bot
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_CHANNEL:    "#brout-group-daily-arxiv-bot"
           SLACK_USERNAME:   "astro-bot"
           SLACK_ICON:       ":robot_face:"
-        run: |
-          python post_.py
+        run: python post_.py
