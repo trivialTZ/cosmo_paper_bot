@@ -1,78 +1,71 @@
 #!/usr/bin/env python3
 """
-Fetch all astro-ph papers from arXiv, find those whose title or abstract
-contains any keyword from astro_key.txt, then print **all** papers
-from the **newest** publication date in the format:
-
-2504.17688v1 : The Hubble Image Similarity Project
-  http://arxiv.org/abs/2504.17688v1
- [hubble space telescope]
+Run read_arxiv.py to fetch matching arXiv papers, then post to Slack
+with a blank line separating each paper block.
 """
+import os
+import subprocess
 import sys
-from datetime import datetime
-import feedparser
+import requests
 
-def load_keywords(path='astro_key.txt'):
-    try:
-        with open(path) as f:
-            kws = [line.strip().lower() for line in f if line.strip()]
-    except FileNotFoundError:
-        sys.exit("ERROR: astro_key.txt not found.")
-    if not kws:
-        sys.exit("ERROR: No keywords found in astro_key.txt.")
-    return kws
+# ─── CONFIG ────────────────────────────────────────────────────────────────────
+# Now read all sensitive/config values from environment (set by GitHub Actions)
+WEBHOOK_URL = os.environ['SLACK_WEBHOOK_URL']
+CHANNEL     = os.environ.get('SLACK_CHANNEL', '#jj')
+USERNAME    = os.environ.get('SLACK_USERNAME', 'astro-bot')
+ICON_EMOJI  = os.environ.get('SLACK_ICON', ':robot_face:')
+READ_SCRIPT = 'read_arxiv.py'   # assume script sits in repo root alongside this file
+PYTHON_BIN  = sys.executable    # use the same Python interpreter
 
-def fetch_arxiv_entries(max_results=1000):
-    cats = ["GA", "CO", "EP", "HE", "IM", "SR"]
-    cat_query = "(" + "+OR+".join(f"cat:astro-ph.{c}" for c in cats) + ")"
-    base_url = "http://export.arxiv.org/api/query?"
-    query = (
-        f"search_query={cat_query}"
-        f"&sortBy=submittedDate"
-        f"&sortOrder=descending"
-        f"&max_results={max_results}"
+
+def get_arxiv_results():
+    """Run read_arxiv.py and return its stdout (or stderr on failure)."""
+    proc = subprocess.run(
+        [PYTHON_BIN, READ_SCRIPT],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
     )
-    url = base_url + query
-    feed = feedparser.parse(url)
-    if not feed.entries:
-        sys.exit("No entries returned from arXiv. Check network or query URL.")
-    return feed.entries
+    if proc.returncode != 0:
+        return f"*Error running read_arxiv.py:*\n```{proc.stderr.strip()}```"
+    return proc.stdout.strip() or "No matching arXiv papers found."
 
-def find_matches(entries, keywords):
-    matches = []
-    for e in entries:
-        text = (e.title + " " + e.summary).lower()
-        matched = [kw for kw in keywords if kw in text]
-        if matched:
-            # extract arXiv id (e.g. "2504.17688v1")
-            arxiv_id = e.id.split("/abs/")[-1]
-            # parse published date as a date object
-            dt = datetime.strptime(e.published, "%Y-%m-%dT%H:%M:%SZ").date()
-            matches.append({
-                "id": arxiv_id,
-                "title": e.title.strip(),
-                "url": e.link,
-                "date": dt,
-                "keywords": matched
-            })
-    return matches
 
-def print_newest_date_papers(matches):
-    if not matches:
-        print("No matching papers found.")
-        return
-    # determine the newest date among matches
-    newest_date = max(m["date"] for m in matches)
-    # filter matches to only that date
-    newest_papers = [m for m in matches if m["date"] == newest_date]
-    # print each in the requested format
-    for p in newest_papers:
-        print(f"{p['id']} : {p['title']}")
-        print(f"  {p['url']}")
-        print(f" [{', '.join(p['keywords'])}]")
+def format_with_blank_lines(raw: str) -> str:
+    """
+    Insert a blank line after each keyword line (lines starting with '[' and ending with ']').
+    Ensures separation between each paper block.
+    """
+    lines = raw.splitlines()
+    formatted = []
+    for line in lines:
+        formatted.append(line)
+        stripped = line.strip()
+        if stripped.startswith('[') and stripped.endswith(']'):
+            formatted.append('')  # add blank line
+    return "\n".join(formatted)
+
+
+def post_to_slack(message: str):
+    """Send the given message to Slack via Incoming Webhook."""
+    payload = {
+        "channel":    CHANNEL,
+        "username":   USERNAME,
+        "icon_emoji": ICON_EMOJI,
+        "text":       message
+    }
+    resp = requests.post(WEBHOOK_URL, json=payload)
+    try:
+        resp.raise_for_status()
+    except requests.exceptions.HTTPError:
+        print(f"Slack API error {resp.status_code}: {resp.text}")
+        raise
+
 
 if __name__ == "__main__":
-    keywords = load_keywords('astro_key.txt')
-    entries  = fetch_arxiv_entries()
-    matches  = find_matches(entries, keywords)
-    print_newest_date_papers(matches)
+    raw_results = get_arxiv_results()
+    formatted = format_with_blank_lines(raw_results)
+    # no need for code fences in GitHub Actions; Slack will format plaintext fine
+    message = formatted
+    post_to_slack(message)
+    print("Posted to Slack.")
