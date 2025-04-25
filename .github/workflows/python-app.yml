@@ -27,7 +27,7 @@ jobs:
       - name: Run ArXiv→Slack bot
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_CHANNEL:    "#jj"
+          SLACK_CHANNEL:    "#brout-group-daily-arxiv-bot"
           SLACK_USERNAME:   "astro-bot"
           SLACK_ICON:       ":robot_face:"
         run: |
