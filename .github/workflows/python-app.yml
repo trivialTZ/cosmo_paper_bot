@@ -31,5 +31,4 @@ jobs:
           SLACK_USERNAME:   "astro-bot"
           SLACK_ICON:       ":robot_face:"
         run: |
-          python read_arxiv.py
           python post_.py
