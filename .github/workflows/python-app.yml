@@ -3,9 +3,8 @@ name: "Daily ArXiv → Slack"
 
 on:
   schedule:
-    # every day 12:00 UTC  (08:00 EDT, 07:00 EST)
-    - cron: '0 12 * * *'
-  workflow_dispatch:   # keep manual trigger
+    - cron: '0 12 * * *'      # 12:00 UTC  → 08:00 EDT / 07:00 EST
+  workflow_dispatch:           # keeps the manual Run-workflow button
 
 jobs:
   post-arxiv:
@@ -18,7 +17,7 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install dependencies
+      - name: Install deps
         run: pip install requests feedparser
 
       - name: Run ArXiv → Slack bot
