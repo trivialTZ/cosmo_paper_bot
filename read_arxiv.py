@@ -11,6 +11,7 @@ from the **newest** publication date in the format:
 import sys
 from datetime import datetime
 import feedparser
+import re
 
 def load_keywords(path='astro_key.txt'):
     try:
@@ -50,7 +51,8 @@ def find_matches(entries, keywords):
             dt = datetime.strptime(e.published, "%Y-%m-%dT%H:%M:%SZ").date()
             matches.append({
                 "id": arxiv_id,
-                "title": e.title.strip(),
+                # collapse any run of whitespace (space, tab, newline) to a single space
+                "title": re.sub(r"\s+", " ", e.title).strip(),
                 "url": e.link,
                 "date": dt,
                 "keywords": matched
@@ -69,7 +71,8 @@ def print_newest_date_papers(matches):
     for p in newest_papers:
         print(f"{p['id']} : {p['title']}")
         print(f"  {p['url']}")
-        print(f" [{', '.join(p['keywords'])}]")
+        bolded = ', '.join(f"*{kw}*" for kw in p['keywords'])
+        print(f" [{bolded}]")
 
 if __name__ == "__main__":
     keywords = load_keywords('astro_key.txt')
